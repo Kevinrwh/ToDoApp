@@ -1,25 +1,40 @@
 from flask import Flask, jsonify, request
+from flask_cors import CORS
+import logging
 
 app = Flask(__name__)
 
-# In-memory list of todo items
+app.logger.setLevel(logging.DEBUG)
+
+# Handle CORS in the Flask app to allow requests from your React app's origin.
+CORS(app)
+
+# In-memory list of todos
 todos = []
 
+# Add a todo the list of todos
 @app.route('/todos', methods=['POST'])
 def add_todo():
 
+    app.logger.debug("Adding todos")
+
     # Get the task and add a corresponding ID
     todo = request.json.get('task', '')
-    new_id = max(todo['id'] for todo in todos) + 1 if todos else 1
 
-    # Add the task and initialize completion as incomplete
+    if not todo:
+        return jsonify({'error': 'The task field is required.'}), 400
+    
+    new_id = len(todos)+1
     todos.append({'id': new_id, 'task': todo, 'completed': False})
 
-    # Return the result to the user, which is 0-indexed
     return jsonify(get_todo(new_id)), 201
 
+# Delete a todo
 @app.route('/todos/<int:task_id>', methods=['DELETE'])
 def delete_todo_route(task_id):
+
+    app.logger.debug("Deleting todos")
+
     if delete_todo(task_id):
         return jsonify({'message': 'Todo removed successfully'}), 200
     else:
@@ -27,6 +42,9 @@ def delete_todo_route(task_id):
     
 @app.route('/todos/<int:task_id>', methods=['PUT'])
 def update_todo_route(task_id):
+
+    app.logger.debug("Updating todos")
+
     data = request.json
     success = update_todo(task_id, new_task=data.get('task'), new_completed=data.get('completed'))
     if success:
@@ -35,18 +53,23 @@ def update_todo_route(task_id):
         return jsonify({'error': 'Todo not found'}), 404
 
 
-# Route to get all todo items
+# Get all todos
 @app.route('/todos', methods=['GET'])
 def get_todos():
+
+    app.logger.debug("Getting todos")
+    
     return jsonify({'todos': todos})
 
-# Get a todo item
+# Get a todo by id
 def get_todo(task_id):
     return next((todo for todo in todos if todo['id'] == task_id), None)
 
-# Remove a todo
+# Remove a todo by id
 def delete_todo(task_id):
+
     todo_to_remove = next((todo for todo in todos if todo['id'] == task_id), None)
+
     if todo_to_remove is not None:
         todos.remove(todo_to_remove)
         print(f"Todo with id {task_id} was removed successfully.")
@@ -55,6 +78,7 @@ def delete_todo(task_id):
         print(f"Todo with id {task_id} was not found.")
         return False
     
+# Look for and update the todo if found in the list
 def update_todo(task_id, new_task=None, new_completed=None):
     for todo in todos:
         if todo['id'] == task_id:
